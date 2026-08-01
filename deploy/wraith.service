@@ -1,0 +1,15 @@
+[Unit]
+Description=WRAITH browser hook lab
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/wraith
+ExecStart=/usr/bin/node server.js
+EnvironmentFile=/opt/wraith/wraith.env
+Restart=on-failure
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target

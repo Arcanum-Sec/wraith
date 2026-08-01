@@ -1,0 +1,24 @@
+# --- secrets & runtime state (NEVER commit) ---
+.env
+*.env
+!.env.example
+!deploy/wraith.env.example
+wraith.env
+
+# captured session loot written by the store
+data/
+*.sessions.json
+
+# --- dependencies / build ---
+node_modules/
+
+# --- logs & OS cruft ---
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# --- editor / tooling ---
+.idea/
+.vscode/
+.claude/

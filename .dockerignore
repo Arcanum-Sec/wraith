@@ -1,0 +1,16 @@
+# Keep secrets, loot, and local deps OUT of the build context / image.
+.env
+*.env
+wraith.env
+data/
+node_modules/
+.git/
+.gitignore
+.claude/
+*.log
+.DS_Store
+
+# Docs / deploy tooling aren't needed inside the runtime image.
+*.md
+deploy/
+setup.sh

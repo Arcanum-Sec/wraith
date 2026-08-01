@@ -1,0 +1,30 @@
+{
+  "name": "wraith",
+  "version": "1.0.0",
+  "description": "WRAITH - a modern, standalone browser-hooking framework for red teams, researchers, and educators. A clean-room successor to BeEF's hook + Pretty Theft and blind-XSS callback tooling, built for hooking browsers across modern (including AI) app ecosystems. For authorized security testing, research & education only.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "security-education",
+    "browser-hook",
+    "blind-xss",
+    "phishing-awareness",
+    "social-engineering",
+    "training"
+  ],
+  "author": "Arcanum Information Security (https://arcanum-sec.com)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arcanum-sec/wraith"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}

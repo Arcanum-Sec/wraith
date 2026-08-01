@@ -1,0 +1,23 @@
+# WRAITH — run with:  ./setup.sh   (writes .env, then brings this up)
+# Or manually:  cp .env.example .env && edit it && docker compose up -d --build
+#
+# Compose reads .env automatically for both ${VAR} substitution below AND, via
+# env_file, for injecting config into the container. .env holds your secrets and
+# is gitignored — it is never copied into the image.
+
+services:
+  wraith:
+    build: .
+    image: wraith:latest
+    container_name: wraith
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Always bind all interfaces inside the container; the host port mapping
+      # below is what actually controls exposure.
+      WRAITH_HOST: "0.0.0.0"
+    ports:
+      - "${WRAITH_PORT:-8090}:${WRAITH_PORT:-8090}"
+    volumes:
+      # Persist captured sessions on the host, outside the image.
+      - ./data:/app/data
