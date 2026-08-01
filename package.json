@@ -18,7 +18,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/arcanum-sec/wraith"
+    "url": "git+https://github.com/Arcanum-Sec/wraith.git"
   },
   "engines": {
     "node": ">=18"

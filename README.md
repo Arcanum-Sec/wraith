@@ -57,7 +57,7 @@ PRs welcome under the project's [contribution terms](#license--attribution).
 The fastest path. You need Docker + Docker Compose.
 
 ```bash
-git clone https://github.com/arcanum-sec/wraith
+git clone https://github.com/Arcanum-Sec/wraith
 cd wraith
 ./setup.sh
 ```
