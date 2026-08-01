@@ -10,6 +10,8 @@ callback tools we live in.**
 > people you have **explicit authorization** to test. You are responsible for how
 > you use it.
 
+![WRAITH operator console](docs/screenshots/operator-console.png)
+
 ---
 
 ## Why we built it
@@ -19,36 +21,37 @@ kinds of tooling and wishing they were one thing.
 
 On one side was **BeEF** — the Browser Exploitation Framework — for the classic
 *hook a browser, then work from inside its session* workflow: keylog a fake login,
-recon the local network, push a module at a live victim. It's the tool we used in
-class to make man-in-the-browser real to people. But it's showing its age, big
-chunks of it are unreliable in today's browsers, and the social-engineering
-overlays look like logins from a decade ago.
+recon the local network, push a module at a live victim. It's the tool we used to
+make man-in-the-browser real to people. But it's showing its age, big chunks of it
+are unreliable in today's browsers, and the social-engineering overlays look like
+logins from a decade ago.
 
 On the other side were our favorite **blind-XSS callback frameworks** (XSS Hunter,
 ezXSS): drop a payload into a field, and the instant it fires somewhere you can't
 see, it calls home with the loot — origin, cookies, DOM, a screenshot.
 
 What we increasingly needed — especially as more of our targets became **AI
-application ecosystems**, where untrusted text flows through agents, tool
-outputs, admin review queues, and support consoles, and *fires JavaScript in
-places nobody is watching* — was a single framework that did **both**: the
-interactive, persistent post-exploitation control of a BeEF hook, **and** the
-fire-and-forget blind-XSS callback loot, in one payload that's reliable in current
-browsers and looks like today's real login screens.
+application ecosystems**, where untrusted text flows through agents, tool outputs,
+admin review queues, and support consoles, and *fires JavaScript in places nobody
+is watching* — was a single framework that did **both**: the interactive,
+persistent post-exploitation control of a BeEF hook, **and** the fire-and-forget
+blind-XSS callback loot, in one payload that's reliable in current browsers and
+looks like today's real login screens.
 
 So we built **WRAITH**.
 
 ## Heads up: this is a work in progress
 
 We're releasing WRAITH **early, and on purpose.** We'd rather get it into the
-hands of the people who'll actually teach and test with it — and hear what breaks —
-than sit on it until it's "done."
+hands of the people who'll actually use it — and hear what breaks — than sit on it
+until it's "done."
 
 That means: **expect rough edges and bugs.** Some modules are more battle-tested
 than others, browser behavior shifts under us constantly (see the network-scan
 notes below), and APIs may change between versions. If you hit something, please
-open an issue — repro steps, browser + version, and what you expected are gold.
-PRs welcome under the project's [contribution terms](#license--attribution).
+[open an issue](https://github.com/Arcanum-Sec/wraith/issues) — repro steps,
+browser + version, and what you expected are gold. PRs welcome under the project's
+[contribution terms](#license--attribution).
 
 ---
 
@@ -92,6 +95,11 @@ docker compose down         # stop (keeps ./data)
 Captured sessions persist in `./data/` on the host — **never** baked into the
 image, **never** committed (`.env` and `data/` are gitignored).
 
+The operator console is **login-gated** whenever an operator password is set, with
+a username + password sign-in:
+
+![Operator login](docs/screenshots/login.png)
+
 ### Run it locally without Docker (dev)
 
 ```bash
@@ -107,71 +115,129 @@ accidentally expose an open panel.
 
 ---
 
-## What it does
+## Features
 
-1. **Hook** — `/hook.js` is a small payload. Drop it in any lab page
-   (`<script src="/hook.js"></script>`) or deliver it via an XSS in your lab target.
-   The browser that loads it opens a WebSocket back to the operator and appears in
-   the console with a fingerprint (browser, OS, IP, page, UA). It auto-reconnects
-   and survives navigation.
-2. **Operator console** — `/operator/` shows every hooked browser online/offline,
-   lets you pick one and **deploy** an overlay at it, and streams the victim's
-   **keystrokes live** plus the final **captured credentials**. It also ships an
-   **XSS payload catalog** (XSS-Hunter-style) auto-filled with your hook URL.
-3. **Overlay modules** — modernized fake-login overlays, rendered in an isolated
-   shadow DOM so they look pixel-correct on any host page, and they frost-blur the
-   page behind them like a real re-auth modal:
-   - **LinkedIn** — "session expired" re-auth
-   - **Facebook** — "you've been logged out" re-login
-   - **Microsoft / Office 365** — authentic two-step (email → password)
-4. **Local Network Scan** (task module) — uses the hooked browser as a proxy to
-   reach the victim's **local** services / LAN. Calibrated loopback service scan
-   plus (browser-permitting) LAN modes, and a WebRTC local-IP leak. Results stream
-   live into the console.
-5. **Page Capture** (task module) — the **blind-XSS** loot: grabs the **origin +
-   URL + referrer** (where the payload fired), the victim's **cookies**
-   (non-HttpOnly), the full **DOM**, and a **screenshot** (html2canvas). The hook
-   reports origin and a JS-readable-cookie count automatically on first contact,
-   mirroring the instant a real blind-XSS payload calls home.
-6. **Page Mirror** — browse the victim's origin from inside their session:
-   fetch same-origin URLs *through* the hooked browser (carrying their cookies),
-   or grab the live DOM.
+### Hook + operator console
 
-Adding a module is one file in `modules/` — see `modules/linkedin.js` (overlay)
-or `modules/portscan.js` / `modules/capture.js` (background tasks).
+`/hook.js` is a small payload. Drop it in any page you control
+(`<script src="/hook.js"></script>`) or deliver it via an XSS in your target. The
+browser that loads it opens a WebSocket back to the operator, fingerprints itself
+(browser, OS, IP, page, UA), auto-reconnects, and survives navigation. Every
+hooked browser shows up live in the console, where you pick one and drive it — the
+full dashboard is the hero shot at the top of this README: hooked-browser roster,
+target detail, deploy controls, live activity feed, and captured credentials.
 
-### A built-in practice lab
+### Social-engineering overlays
 
-Mounted at `/lab` is a deliberately vulnerable "support desk" with a stored-XSS
-sink, so you can demo the whole chain end to end, same-origin: submit a malicious
-ticket → an "agent" reviews the queue and the payload fires (the blind-XSS moment)
-→ Page Mirror the hooked agent and pull a credential vault that only resolves
-*inside* their authenticated session. It's intentionally insecure by design and
-carries planted flags.
+Modernized fake-login overlays, rendered in an **isolated shadow DOM** so they
+look pixel-correct on any host page and frost-blur the page behind them like a
+real re-auth modal. Ships with **LinkedIn**, **Facebook**, and **Microsoft /
+Office 365** (authentic two-step email → password).
 
-### Teaching blind XSS on this platform
+![LinkedIn re-auth overlay over a host page](docs/screenshots/overlay-linkedin.png)
 
-The hook fires the moment it loads, exactly like a blind-XSS payload dropped into
-a stored field that later renders in some admin/support/log/agent context you
-can't see. **Page Capture** is the callback loot those frameworks collect. Lessons
-surfaced in the data:
+### Live keystrokes + captured credentials
+
+Every character the target types into an overlay streams to the console in real
+time, and the submitted credentials land in **Captured Credentials** — all
+persisted so nothing is lost on refresh or restart.
+
+![Live keystrokes and captured credential](docs/screenshots/captured-credentials.png)
+
+### Page Capture — the blind-XSS loot
+
+The instant a browser hooks, WRAITH auto-fires **Page Capture**: exactly what a
+blind-XSS framework grabs when your payload fires somewhere you can't see —
+**where** it fired (origin + URL + referrer), the victim's **cookies**
+(non-HttpOnly), the full **DOM**, and a **screenshot**. Failures are reported
+honestly, because they *are* the lesson: HttpOnly cookies never appear, and CSP or
+cross-origin canvas tainting can block the screenshot.
+
+![Page Capture blind-XSS loot](docs/screenshots/page-capture.png)
+
+### Page Mirror — go beyond the screenshot 🆕
+
+**This is where WRAITH goes further than the tools it replaces.** When you land a
+blind XSS or a hook in a page, most frameworks stop at a **screenshot and a dump
+of raw HTML** — you can see *where* your payload fired, but you can't actually *do*
+anything with it.
+
+WRAITH's **Page Mirror** turns that dead-end loot into a **live, navigable view of
+the application**. Open the hooked page as a real, rendered browser view inside the
+operator console — then **click links and move through the app visually**, just
+like the victim would.
+
+![Page Mirror — a live, clickable view of the hooked page](docs/screenshots/page-mirror.png)
+
+The key: **every navigation is fetched *through the hooked browser***, so it rides
+the victim's session and same-origin trust. Any page, endpoint, or feature the
+victim's session can reach, **you can reach too** — including pages gated behind an
+authenticated session cookie you never see (and, being HttpOnly, could never steal
+outright).
+
+In the example below, we start on a support-agent's ticket queue and click
+straight through to an internal **Credential Vault** — a page that only resolves
+inside an authenticated agent session. No credentials phished, no cookie stolen:
+we simply rode the victim's session to it.
+
+![Page Mirror reaching a session-gated vault through the victim](docs/screenshots/page-mirror-vault.png)
+
+> Cross-origin reads still fail by design (the Same-Origin Policy holds) — the
+> mirror's reach is exactly the victim's reach, no more, no less. That boundary is
+> itself part of the lesson.
+
+### Blind-XSS payload catalog
+
+An XSS-Hunter-style catalog of ready-to-fire injection strings for every context
+(HTML, attribute breakout, tag-close, event handlers, JS context, `javascript:`
+URIs, jQuery), each auto-filled with **your** hook URL and one-click copyable.
+
+![Blind-XSS payload catalog](docs/screenshots/payload-catalog.png)
+
+### Local / localhost network scan
+
+Uses the hooked browser as a proxy to fingerprint the victim's **local** services.
+It's a **timing side-channel**, rebuilt for current browsers — the reliable default
+is a *calibrated* `127.0.0.1` scan using **two independent primitives** (fetch- and
+WebSocket-timing, the literal eBay `check.js` method). LAN modes are included but
+honestly labeled, because Chrome 142+ Local Network Access now gates them (see
+[below](#about-the-network-scan-read-before-you-demo-it)).
+
+### Built-in practice lab
+
+A deliberately vulnerable "support desk" at `/lab` with a stored-XSS sink, so you
+can demo the whole chain end to end, same-origin: submit a malicious ticket → an
+"agent" reviews the queue and the payload fires (the blind-XSS moment) → Page
+Mirror the hooked agent and pull the session-gated vault. Intentionally insecure by
+design, with planted flags.
+
+![The built-in vulnerable practice lab](docs/screenshots/practice-lab.png)
+
+---
+
+## Teaching blind XSS on this platform
+
+The hook fires the moment it loads, exactly like a blind-XSS payload dropped into a
+stored field that later renders in some admin/support/log/agent context you can't
+see. Lessons surfaced right in the data:
 
 - **Cookies are JS-readable only.** HttpOnly cookies never appear, which is the
-  whole point of HttpOnly. The viewer says so when the list is empty.
+  whole point of HttpOnly — and exactly why Page Mirror's *ride the session*
+  approach matters more than *steal the cookie*.
 - **Screenshots are best-effort.** html2canvas can be blocked by **CSP**, and
   **cross-origin images taint the canvas** so it can't be exported. Those failures
-  are reported honestly instead of hidden — they are the lesson.
+  are reported honestly instead of hidden.
 - **Origin + referrer tell you where you landed**, which for blind XSS is the
   entire question ("where did my payload execute?").
 
 For an offline lab, self-host html2canvas — see `public/vendor/README.md`.
 
-### About the network scan (read before you demo it)
+## About the network scan (read before you demo it)
 
-It is a **timing side-channel**, not a real socket scanner. JavaScript cannot read
-cross-origin responses, but it can start a request and watch how it fails and how
-fast, which leaks port state. The module was rebuilt around what works in **current
-browsers (2025–2026)**, because the old BeEF-era LAN sweep is now dead.
+JavaScript cannot read cross-origin responses, but it can start a request and watch
+how it fails and how fast, which leaks port state. The module was rebuilt around
+what works in **current browsers (2025–2026)**, because the old BeEF-era LAN sweep
+is now dead.
 
 **The modern reality:** Chrome 142+ (Oct 2025) shipped **Local Network Access
 (LNA)**, which gates requests to private ranges (10.x / 172.16.x / **192.168.x**)
@@ -183,19 +249,14 @@ to fingerprint local services and remote-access tools.
 So the module has three modes:
 
 - **This machine (localhost)** — the **reliable default**. A *calibrated*
-  `127.0.0.1` scan that probes each port with **two independent primitives**:
-  fetch-timing **and** WebSocket-timing (the literal eBay `check.js` method). It
-  first probes known-closed ports to learn this machine's RST baseline on each
-  channel, then flags anything that resolves, hangs, or runs slower as **OPEN**,
-  labels the likely service, and shows per-port whether **fetch**, **ws**, or
-  **both** agreed. Works in Chrome **and** Firefox today.
+  `127.0.0.1` scan that probes each port with fetch-timing **and** WebSocket-timing,
+  learns this machine's RST baseline first, then flags anything that resolves,
+  hangs, or runs slower as **OPEN**, labels the likely service, and shows whether
+  **fetch**, **ws**, or **both** agreed. Works in Chrome **and** Firefox today.
 - **LAN host** — scan one private IP. Works only if the browser lets it through;
   Chrome 142+ will usually block it (the module detects this and says so).
-- **Discover LAN hosts** — subnet sweep. Mostly LNA-blocked now; kept to *show*
-  the block as the lesson.
-
-**Statuses:** OPEN (service answered / socket held), CLOSED (fast RST near the
-calibrated baseline), FILTERED (hung — LAN only), BLOCKED (browser-refused port).
+- **Discover LAN hosts** — subnet sweep. Mostly LNA-blocked now; kept to *show* the
+  block as the lesson.
 
 ## How it maps to BeEF (for the lecture)
 
@@ -207,38 +268,34 @@ calibrated baseline), FILTERED (hung — LAN only), BLOCKED (browser-refused por
 | Pretty Theft module | overlay `modules/*.js` (modern LinkedIn/Facebook/Microsoft) |
 | Network discovery / port scanner | `modules/portscan.js` (calibrated, current-browser) |
 | Command results | Live keystrokes + Captured Credentials + Scan Results |
-| *(BeEF had no blind-XSS callback)* | **Page Capture** (origin/cookies/DOM/screenshot) |
+| *(no equivalent)* | **Page Capture** (blind-XSS loot) + **Page Mirror** (navigate the app) |
 
 ## "How is this different from blind XSS, Evilginx, or EvilGoPhish?"
 
-Students ask this every time. The short answer: these tools live at **different
-stages of the attack** and abuse **different trust contexts**. They're
-complementary, and they chain together.
+These tools live at **different stages of the attack** and abuse **different trust
+contexts**. They're complementary, and they chain together.
 
 | | WRAITH / BeEF | Blind-XSS frameworks (XSS Hunter, ezXSS) | AiTM proxies (Evilginx, EvilGoPhish, Modlishka) |
 |---|---|---|---|
 | What it is | Man-in-the-browser **post-exploitation** C2 (+ blind-XSS loot) | XSS **detection + proof** with one-shot recon | **Adversary-in-the-middle** reverse proxy |
-| Prerequisite | You already have **JS running in the page** (XSS, malicious/compromised site, injection) | Same: your payload executes somewhere you can't see | Victim **clicks a link and logs in** on your lookalike domain. No XSS needed |
+| Prerequisite | You already have **JS running in the page** | Same: your payload executes somewhere you can't see | Victim **clicks a link and logs in** on your lookalike domain |
 | Origin it abuses | The victim's **real session / real origin** | The vulnerable app's origin | A **separate attacker domain** proxying the real site |
-| What the victim sees | A **fake** dialog we draw over any page | Nothing (the payload just fires) | The **real** login page, transparently proxied |
-| What you capture | Typed credentials + keystrokes + browser/LAN recon + blind-XSS loot | "It fired, and here": DOM, cookies, screenshot, origin | Real creds **and the post-MFA session token** |
+| What you capture | Creds + keystrokes + recon + blind-XSS loot **+ navigate the app via Page Mirror** | "It fired, and here": DOM, cookies, screenshot, origin | Real creds **and the post-MFA session token** |
 | Beats MFA? | **No** — you phished a static credential | Only if it rides a live authed session in-page | **Yes** — stealing the post-auth session cookie is the point |
 
 The honest distinction to teach: our overlay phish harvests **what the user
-types**. It does **not** capture a real session and does **not** beat MFA, because
-the user never completed a genuine proxied auth flow. That's exactly why it's a
-great contrast — it shows why static-credential phishing is weaker than AiTM, and
-sets up why the industry moved to **phishing-resistant, origin-bound auth
-(FIDO2 / WebAuthn / passkeys)**. A realistic kill chain uses all three: blind XSS
-finds and delivers code execution, a WRAITH hook gives interactive in-session
-control, and a redirect can funnel the victim into an Evilginx flow for a real
-MFA-passed session.
+types** — it does **not** capture a real session or beat MFA. That's exactly why
+it's a great contrast, and why the industry moved to **phishing-resistant,
+origin-bound auth (FIDO2 / WebAuthn / passkeys)**. A realistic kill chain uses all
+three: blind XSS finds and delivers code execution, a WRAITH hook gives interactive
+in-session control (and, via Page Mirror, reaches app functionality directly), and
+a redirect can funnel the victim into an Evilginx flow for a real MFA-passed
+session.
 
 ## Configuration
 
 Everything is env-driven; the same build runs anywhere because `hook.js` derives
-its call-back URL from wherever it was served. `setup.sh` writes these into `.env`;
-you can also set them by hand.
+its call-back URL from wherever it was served. `setup.sh` writes these into `.env`.
 
 | Env var | Default | Purpose |
 |---|---|---|
@@ -251,8 +308,7 @@ you can also set them by hand.
 | `WRAITH_SESSION_HOURS` | `12` | operator session lifetime |
 | `WRAITH_AUTOCAPTURE` | `1` | auto-fire Page Capture on hook (`0` = manual, BeEF-style) |
 
-The operator console is **login-gated** whenever `WRAITH_OP_PASSWORD` is set (a
-signed HttpOnly session cookie covers both the panel and the live WebSocket). The
+A signed HttpOnly session cookie covers both the panel and the live WebSocket. The
 hook payload, demo page, and `/ws/hook` channel stay public so victims can reach
 them. As a fail-safe, the server **refuses to bind to a public interface** unless a
 password is set.
@@ -275,6 +331,7 @@ public/vendor/       optional self-hosted libs (html2canvas for offline screensh
 setup.sh             interactive Docker installer
 Dockerfile           / docker-compose.yml
 deploy/              bare-metal systemd alternative
+docs/screenshots/    images used in this README
 ```
 
 ## License & attribution
