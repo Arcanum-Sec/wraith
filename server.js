@@ -29,6 +29,24 @@ app.disable('x-powered-by');
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
+// Content-Security-Policy: structural backstop for every page we serve. Inline
+// event handlers (onerror=, onload=, ...) are the entire injected-attribute XSS
+// class -- 'self' + the mirror router's literal hash renders them inert even if
+// a renderer forgets to escape. The sha256 hash whitelists mirrorDoc()'s inline
+// router script in operator.js (srcdoc inherits this policy); RECOMPUTE IT if
+// that script text ever changes.
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' 'sha256-lZWtylyBGioFVix8oaG/uDH75c1FW0u0XnS0Dpubrk8='; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: http: https:; " +
+    "connect-src 'self' ws: wss:; " +
+    "frame-ancestors 'none'; " +
+    "object-src 'none'; base-uri 'self'");
+  next();
+});
+
 // ---- operator authentication -------------------------------------------
 // A signed HttpOnly session cookie gates the operator console (static panel +
 // live WebSocket). The hook payload, the demo page, and the /ws/hook channel
